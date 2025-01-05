@@ -2,13 +2,11 @@
 
 </script>
 
-<main>
-    <h1>Hello !!!!</h1>
-</main>
+<h1>Hello !!!!</h1>
 
 <style>
-    main{
+    h1{
         text-align: center;
-        font-size: 2rem;
+        font-size: 4rem;
     }
 </style>
