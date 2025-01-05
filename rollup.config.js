@@ -40,11 +40,19 @@ function assembledHtml(pageName){
             let css = fs.readFileSync(`public/${pageName}.css`, 'utf8');
             fs.unlinkSync(`public/${pageName}.css`);
             let js = fs.readFileSync(`public/${pageName}.html`, 'utf8');
-            let newHtml = templateHtml
-            .replace('<!-- style -->', `<style>${new cleancss().minify(globalCss).styles+css}</style>`)
-            .replace('<!-- script -->', `<script id="svelteScript">${js}svelteScript.remove()</script>`)
-            .replace('<!-- title -->', `<title>${pageName}</title>`);
-            fs.writeFileSync(`public/${pageName}.html`, newHtml);
+
+            let html = templateHtml
+            .replace('<!-- title -->', ()=>{
+                return `<title>${pageName}</title>`
+            })
+            .replace('<!-- style -->', ()=>{
+                return `<style>${new cleancss().minify(globalCss).styles+css}</style>`
+            })
+            .replace('<!-- script -->', ()=>{
+                return `<script id="svelteScript">${js}svelteScript.remove()</script>`
+            });
+            
+            fs.writeFileSync(`public/${pageName}.html`, html);
         }
     };
 }
