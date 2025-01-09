@@ -53,6 +53,11 @@ function assembledHtml(pageName){
             });
             
             fs.writeFileSync(`public/${pageName}.html`, html);
+
+            //复制src/assets文件夹
+            if (fs.existsSync('src/assets')) {
+                fs.cpSync('src/assets', 'public/assets', { recursive: true });
+            }
         }
     };
 }
