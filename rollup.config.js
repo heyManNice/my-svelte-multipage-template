@@ -1,4 +1,3 @@
-import { spawn } from 'child_process';
 import svelte from 'rollup-plugin-svelte';
 import commonjs from '@rollup/plugin-commonjs';
 import terser from '@rollup/plugin-terser';
@@ -7,26 +6,58 @@ import livereload from 'rollup-plugin-livereload';
 import css from 'rollup-plugin-css-only';
 import fs from 'fs';
 import cleancss from 'clean-css';
+import http from 'http';
+import routes from './fake-backend/routes.js';
+import apis from './fake-backend/apis.js';
 
 const production = !process.env.ROLLUP_WATCH;
+const STATIC_DIR = 'public';
+const SOURCE_DIR = 'src';
+
 
 function serve() {
-	let server;
-
-	function toExit() {
-		if (server) server.kill(0);
-	}
-
 	return {
-		writeBundle() {
-			if (server) return;
-			server = spawn('npm', ['run', 'start', '--', '--dev'], {
-				stdio: ['ignore', 'inherit', 'inherit'],
-				shell: true
-			});
+		writeBundle:()=>{
+			if (global.server) return;
+			global.server = http.createServer((req, res) => {
+                //处理日志
+                const startTime = Date.now();
+                const oldEnd = res.end;
+                res.end = function(...args){
+                    console.log(`${req.method}  ${res.statusCode}  ${Date.now()-startTime}ms  ${req.url}`);
+                    oldEnd.apply(this, args);
+                };
+                //处理路由
+                if(routes[req.url]){
+                    res.writeHead(200, { 'Content-Type': 'text/html' });
+                    return res.end(fs.readFileSync(STATIC_DIR+'/'+routes[req.url]));
+                }
+                //处理虚拟api
+                if(apis[req.url]){
+                    const result = apis[req.url];
+                    if(typeof result === 'function'){
+                        return result(req,res);
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    return res.end(JSON.stringify(apis[req.url]));
+                }
+                //处理资源文件
+                if(req.url.split('/')[1]==='assets' && fs.existsSync(STATIC_DIR+req.url)){
+                    res.writeHead(200, { 'Content-Type': 'text/html' });
+                    return res.end(fs.readFileSync(STATIC_DIR+req.url));
+                }
 
-			process.on('SIGTERM', toExit);
-			process.on('exit', toExit);
+                res.writeHead(404, { 'Content-Type': 'text/html' });
+                return res.end();
+            });
+            let port = 8080;
+            global.server.listen(port, () => {
+                console.log('\n\n  Your application is ready~! 🚀');
+                console.log('\n- Local:\thttp://localhost:'+port);
+                console.log('\n\n────────────────── LOGS ──────────────────');
+                
+            });
+            
 		}
 	};
 }
@@ -34,12 +65,12 @@ function serve() {
 function assembledHtml(pageName){
     return {
         writeBundle: function(options, bundle) {
-            let templateHtml = fs.readFileSync('src/template.html', 'utf8');
-            let globalCss = fs.readFileSync('src/global.css', 'utf8');
+            let templateHtml = fs.readFileSync(SOURCE_DIR+'/template.html', 'utf8');
+            let globalCss = fs.readFileSync(SOURCE_DIR+'/global.css', 'utf8');
 
-            let css = fs.readFileSync(`public/${pageName}.css`, 'utf8');
-            fs.unlinkSync(`public/${pageName}.css`);
-            let js = fs.readFileSync(`public/${pageName}.html`, 'utf8');
+            let css = fs.readFileSync(`${STATIC_DIR}/${pageName}.css`, 'utf8');
+            fs.unlinkSync(`${STATIC_DIR}/${pageName}.css`);
+            let js = fs.readFileSync(`${STATIC_DIR}/${pageName}.html`, 'utf8');
 
             let html = templateHtml
             .replace('<!-- title -->', ()=>{
@@ -52,7 +83,7 @@ function assembledHtml(pageName){
                 return `<script id="svelteScript">${js}svelteScript.remove()</script>`
             });
             
-            fs.writeFileSync(`public/${pageName}.html`, html);
+            fs.writeFileSync(`${STATIC_DIR}/${pageName}.html`, html);
         }
     };
 }
@@ -61,15 +92,15 @@ function copyAssets() {
     return {
         writeBundle: function(options, bundle) {
             //复制src/assets文件夹
-            if (fs.existsSync('src/assets')) {
-                fs.cpSync('src/assets', 'public/assets', { recursive: true });
+            if (fs.existsSync(SOURCE_DIR+'/assets')) {
+                fs.cpSync(SOURCE_DIR+'/assets', STATIC_DIR+'/assets', { recursive: true });
             }
         }
     };
 }
 
 function generateConfigs() {
-    let srcDirs = fs.readdirSync('src/pages').filter((file) => fs.lstatSync(`src/pages/${file}`).isDirectory());
+    let srcDirs = fs.readdirSync(SOURCE_DIR+'/pages').filter((file) => fs.lstatSync(`${SOURCE_DIR}/pages/${file}`).isDirectory());
     let result = [];
     for(let dir of srcDirs){
         const isLast = srcDirs.indexOf(dir) === srcDirs.length - 1;
@@ -97,12 +128,12 @@ function generateConfigs() {
             watch: {
                 clearScreen: false
             },
-            input:`src/pages/${pageName}/main.js`,
+            input:`${SOURCE_DIR}/pages/${pageName}/main.js`,
             output: {
                 sourcemap: false,
                 format: 'iife',
                 name: dir,
-                file: `public/${pageName}.html`
+                file: `${STATIC_DIR}/${pageName}.html`
             }
         }
         result.push(config);
