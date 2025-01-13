@@ -70,8 +70,8 @@ function assembledHtml(pageName){
 
             let css = fs.readFileSync(`${STATIC_DIR}/${pageName}.css`, 'utf8');
             fs.unlinkSync(`${STATIC_DIR}/${pageName}.css`);
-            let js = fs.readFileSync(`${STATIC_DIR}/${pageName}.html`, 'utf8');
-
+            let js = fs.readFileSync(`${STATIC_DIR}/${pageName}.js`, 'utf8');
+            fs.unlinkSync(`${STATIC_DIR}/${pageName}.js`);
             let html = templateHtml
             .replace('<!-- title -->', ()=>{
                 return `<title>${pageName}</title>`
@@ -133,7 +133,7 @@ function generateConfigs() {
                 sourcemap: false,
                 format: 'iife',
                 name: dir,
-                file: `${STATIC_DIR}/${pageName}.html`
+                file: `${STATIC_DIR}/${pageName}.js`
             }
         }
         result.push(config);
