@@ -2,7 +2,6 @@ import svelte from 'rollup-plugin-svelte';
 import commonjs from '@rollup/plugin-commonjs';
 import terser from '@rollup/plugin-terser';
 import resolve from '@rollup/plugin-node-resolve';
-import livereload from 'rollup-plugin-livereload';
 import css from 'rollup-plugin-css-only';
 import fs from 'fs';
 import cleancss from 'clean-css';
@@ -44,11 +43,40 @@ const STATIC_DIR = 'public';
 const SOURCE_DIR = 'src';
 
 
+function serverReloadAll(){
+    if(!global.liveReloadConnectionList) return;
+    for(let id in global.liveReloadConnectionList){
+        global.liveReloadConnectionList[id].write('reload\n');
+    }
+}
+
+function generateRandomId() {
+    const timestamp = Date.now().toString();
+    const randomChars = Math.random().toString(36).substring(2, 7);
+    return timestamp + randomChars;
+}
+
 function serve() {
 	return {
 		writeBundle:()=>{
+            serverReloadAll(); 
 			if (global.server) return;
 			global.server = http.createServer((req, res) => {
+                //处理热重载链接
+                if(req.url=='/114514/livereload'){
+                    res.writeHead(200, {
+                        'Content-Type': 'text/txt',
+                        'Cache-Control': 'no-cache',
+                        'Connection': 'keep-alive'
+                    });
+                    let id = generateRandomId();
+                    if(!global.liveReloadConnectionList) global.liveReloadConnectionList = {};
+                    global.liveReloadConnectionList[id] = res; 
+                    req.on('close', () => {
+                        delete global.liveReloadConnectionList[id];
+                    });
+                    return;
+                }
                 //处理日志
                 const startTime = Date.now();
                 const oldEnd = res.end;
@@ -110,6 +138,32 @@ function assembledHtml(pageName){
             let js = fs.readFileSync(jsPath, 'utf8');
             fs.unlinkSync(jsPath);
             console.log(`${AESC.green}deleted ${AESC.bold}${jsPath}${AESC.reset}`);
+            let livereloadScript = ``;
+            if(!production){
+                livereloadScript='console.log("热重载服务已启用");'+function liveReloadConnect(){
+                    //热重载脚本
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', '114514/livereload', true);
+                    xhr.onreadystatechange = function() {
+                        if (xhr.readyState === 3) {
+                            const responseArray = xhr.responseText.split('\n');
+                            const response = responseArray[responseArray.length-2];
+                            switch (response) {
+                                case 'reload':
+                                    location.reload();
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                    };
+                    xhr.onerror = function() {
+                        console.log('热重载服务器连接失败,3秒后重试');
+                        setTimeout(liveReloadConnect,3000)
+                    };
+                    xhr.send();
+                }.toString()+';liveReloadConnect();'; 
+            }
 
             let html = templateHtml
             .replace('<!-- title -->', ()=>{
@@ -119,7 +173,7 @@ function assembledHtml(pageName){
                 return `<style>${new cleancss().minify(globalCss).styles+css}</style>`
             })
             .replace('<!-- script -->', ()=>{
-                return `<script id="svelteScript">${js}svelteScript.remove()</script>`
+                return `<script id="svelteScript">${js}svelteScript.remove();${livereloadScript}</script>`
             });
             
             fs.writeFileSync(targetHtmlPath, html);
@@ -168,7 +222,6 @@ function generateConfigs() {
                 assembledHtml(pageName),
                 isLast && copyAssets(),
                 isLast && !production && serve(),
-                isLast && !production && livereload('public')
             ],
             watch: {
                 clearScreen: false
