@@ -58,8 +58,8 @@ function generateRandomId() {
 
 function serve() {
 	return {
-		writeBundle:()=>{
-            serverReloadAll(); 
+		closeBundle:()=>{
+            serverReloadAll();
 			if (global.server) return;
 			global.server = http.createServer((req, res) => {
                 //处理热重载链接
