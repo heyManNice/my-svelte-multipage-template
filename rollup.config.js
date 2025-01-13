@@ -10,6 +10,35 @@ import http from 'http';
 import routes from './fake-backend/routes.js';
 import apis from './fake-backend/apis.js';
 
+const AESC = {
+    reset: '\x1b[0m',
+    bold: '\x1b[1m',
+    dim: '\x1b[2m',
+    italic: '\x1b[3m',
+    underline: '\x1b[4m',
+    blink: '\x1b[5m',
+    reverse: '\x1b[7m',
+    hidden: '\x1b[8m',
+    strikethrough: '\x1b[9m',
+    black: '\x1b[30m',
+    red: '\x1b[31m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    blue: '\x1b[34m',
+    magenta: '\x1b[35m',
+    cyan: '\x1b[36m',
+    white: '\x1b[37m',
+    bgBlack: '\x1b[40m',
+    bgRed: '\x1b[41m',
+    bgGreen: '\x1b[42m',
+    bgYellow: '\x1b[43m',
+    bgBlue: '\x1b[44m',
+    bgMagenta: '\x1b[45m',
+    bgCyan: '\x1b[46m',
+    bgWhite: '\x1b[47m'
+};
+
+
 const production = !process.env.ROLLUP_WATCH;
 const STATIC_DIR = 'public';
 const SOURCE_DIR = 'src';
@@ -52,9 +81,9 @@ function serve() {
             });
             let port = 8080;
             global.server.listen(port, () => {
-                console.log('\n\n  Your application is ready~! 🚀');
-                console.log('\n- Local:\thttp://localhost:'+port);
-                console.log('\n\n────────────────── LOGS ──────────────────');
+                console.log(`\n\n${AESC.bold}  Your application is ready~! 🚀`);
+                console.log(`\n- Local:\thttp://localhost:${port}${AESC.reset}`);
+                console.log(`\n\n──────────────────${AESC.bgYellow} LOGS ${AESC.reset}──────────────────`);
                 
             });
             
@@ -64,14 +93,24 @@ function serve() {
 
 function assembledHtml(pageName){
     return {
-        writeBundle: function(options, bundle) {
-            let templateHtml = fs.readFileSync(SOURCE_DIR+'/template.html', 'utf8');
-            let globalCss = fs.readFileSync(SOURCE_DIR+'/global.css', 'utf8');
+        closeBundle: function(options, bundle) {
+            let templateHtmlPath = `${SOURCE_DIR}/template.html`;
+            let globalCssPath = `${SOURCE_DIR}/global.css`;
+            let cssPath = `${STATIC_DIR}/${pageName}.css`;
+            let jsPath = `${STATIC_DIR}/${pageName}.js`;
+            let targetHtmlPath = `${STATIC_DIR}/${pageName}.html`;
 
-            let css = fs.readFileSync(`${STATIC_DIR}/${pageName}.css`, 'utf8');
-            fs.unlinkSync(`${STATIC_DIR}/${pageName}.css`);
-            let js = fs.readFileSync(`${STATIC_DIR}/${pageName}.js`, 'utf8');
-            fs.unlinkSync(`${STATIC_DIR}/${pageName}.js`);
+            let templateHtml = fs.readFileSync(templateHtmlPath, 'utf8');
+            let globalCss = fs.readFileSync(globalCssPath, 'utf8');
+
+            let css = fs.readFileSync(cssPath, 'utf8');
+            fs.unlinkSync(cssPath);
+            console.log(`${AESC.green}deleted ${AESC.bold}${cssPath}${AESC.reset}`);
+            
+            let js = fs.readFileSync(jsPath, 'utf8');
+            fs.unlinkSync(jsPath);
+            console.log(`${AESC.green}deleted ${AESC.bold}${jsPath}${AESC.reset}`);
+
             let html = templateHtml
             .replace('<!-- title -->', ()=>{
                 return `<title>${pageName}</title>`
@@ -83,17 +122,23 @@ function assembledHtml(pageName){
                 return `<script id="svelteScript">${js}svelteScript.remove()</script>`
             });
             
-            fs.writeFileSync(`${STATIC_DIR}/${pageName}.html`, html);
+            fs.writeFileSync(targetHtmlPath, html);
+            console.log(`${AESC.green}created ${AESC.bold}${targetHtmlPath}${AESC.reset}`);
+            
         }
     };
 }
 
 function copyAssets() {
     return {
-        writeBundle: function(options, bundle) {
+        closeBundle: function(options, bundle) {
             //复制src/assets文件夹
-            if (fs.existsSync(SOURCE_DIR+'/assets')) {
-                fs.cpSync(SOURCE_DIR+'/assets', STATIC_DIR+'/assets', { recursive: true });
+            let srcDir = `${SOURCE_DIR}/assets`;
+            let targetDir = `${STATIC_DIR}/assets`;
+            if (fs.existsSync(srcDir)) {
+                fs.cpSync(srcDir, targetDir, { recursive: true });
+                console.log(`${AESC.green}copied ${AESC.bold}${srcDir} → ${targetDir}${AESC.reset}`);
+                
             }
         }
     };
