@@ -100,7 +100,7 @@ function serve() {
                 }
                 //处理资源文件
                 if(req.url.split('/')[1]==='assets' && fs.existsSync(STATIC_DIR+req.url)){
-                    res.writeHead(200, { 'Content-Type': 'text/html' });
+                    res.writeHead(200,);
                     return res.end(fs.readFileSync(STATIC_DIR+req.url));
                 }
 
